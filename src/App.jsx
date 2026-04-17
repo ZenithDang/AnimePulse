@@ -1,25 +1,25 @@
 import { useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
-import FilterBar        from './components/FilterBar';
-import GenreTrendChart  from './components/GenreTrendChart';
-import GenreMomentum    from './components/GenreMomentum';
-import ScoreHeatmap     from './components/ScoreHeatmap';
-import BreakoutTitles   from './components/BreakoutTitles';
-import TitleDetailPanel from './components/TitleDetailPanel';
-import StudioMomentum   from './components/StudioMomentum';
-import StatTiles        from './components/StatTiles';
+import FilterBar          from './components/FilterBar';
+import GenreTrendChart    from './components/GenreTrendChart';
+import GenreMomentum      from './components/GenreMomentum';
+import ScoreHeatmap       from './components/ScoreHeatmap';
+import TitleDetailPanel   from './components/TitleDetailPanel';
+import StudioMomentum     from './components/StudioMomentum';
+import StatTiles          from './components/StatTiles';
+import RankedTitlesPanel  from './components/RankedTitlesPanel';
 import {
   ChartSkeleton,
-  CardSkeleton,
   StatTilesSkeleton,
+  CardSkeleton,
   ErrorBanner,
   LoadingBar,
 } from './components/SkeletonLoader';
 
-import { useSeasonData }  from './hooks/useSeasonData';
-import { useGenreTrends } from './hooks/useGenreTrends';
-import useFilterStore     from './store/filterStore';
+import { useSeasonData }      from './hooks/useSeasonData';
+import { useGenreTrends }     from './hooks/useGenreTrends';
+import useFilterStore         from './store/filterStore';
 
 export default function App() {
   const queryClient = useQueryClient();
@@ -33,6 +33,9 @@ export default function App() {
     breakoutTitles,
     studioData,
     stats,
+    viewershipAggregated,
+    viewershipTrendData,
+    mostWatchedTitles,
   } = useGenreTrends(entries, seasonRange);
 
   const [selectedTitle, setSelectedTitle] = useState(null);
@@ -51,23 +54,21 @@ export default function App() {
     queryClient.invalidateQueries({ queryKey: ['season'] });
   }, [queryClient]);
 
-  const showSkeleton = isLoading && entries.length === 0;
-
-  const isRefetching = isLoading && !showSkeleton;
+  const showSkeleton  = isLoading && entries.length === 0;
+  const isRefetching  = isLoading && !showSkeleton;
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg-base)' }}>
       <LoadingBar visible={isRefetching} />
-      {/* Top bar */}
       <FilterBar />
 
-      {/* Main layout */}
+      {/* Main two-column layout */}
       <main
-        className="flex-1 w-full px-4 py-4"
-        style={{ maxWidth: '1600px', margin: '0 auto', display: 'flex', gap: '16px' }}
+        className="flex-1 w-full px-4 py-4 flex flex-col md:flex-row gap-4"
+        style={{ maxWidth: '1600px', margin: '0 auto' }}
       >
-        {/* Left column — 70% */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {/* Left column */}
+        <div className="flex-1 min-w-0 flex flex-col gap-4">
 
           {isError && (
             <ErrorBanner
@@ -82,6 +83,8 @@ export default function App() {
             <GenreTrendChart
               trendData={trendData}
               aggregated={aggregated}
+              viewershipTrendData={viewershipTrendData}
+              viewershipAggregated={viewershipAggregated}
               onTitleClick={handleTitleClick}
             />
           )}
@@ -91,6 +94,7 @@ export default function App() {
           ) : (
             <ScoreHeatmap
               aggregated={aggregated}
+              viewershipAggregated={viewershipAggregated}
               seasonRange={seasonRange}
               selectedGenres={selectedGenres}
             />
@@ -109,22 +113,15 @@ export default function App() {
           )}
         </div>
 
-        {/* Right sidebar — 30% */}
-        <aside
-          style={{
-            width: '320px',
-            flexShrink: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-          }}
-        >
+        {/* Right sidebar */}
+        <aside className="w-full md:w-80 md:flex-shrink-0 flex flex-col gap-4">
           {showSkeleton ? <StatTilesSkeleton /> : <StatTiles stats={stats} />}
           {showSkeleton ? (
             <CardSkeleton />
           ) : (
-            <BreakoutTitles
-              titles={breakoutTitles}
+            <RankedTitlesPanel
+              breakoutTitles={breakoutTitles}
+              mostWatchedTitles={mostWatchedTitles}
               highlightedId={highlightedId}
               onTitleClick={handleTitleClick}
             />
@@ -132,7 +129,6 @@ export default function App() {
         </aside>
       </main>
 
-      {/* Title detail slide-in panel */}
       <TitleDetailPanel title={selectedTitle} onClose={handleClosePanel} />
     </div>
   );

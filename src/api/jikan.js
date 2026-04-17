@@ -62,10 +62,28 @@ export async function fetchSeason(year, season) {
     hasNext = data.pagination?.has_next_page ?? false;
     page++;
 
-    if (page > 4) break; // cap at ~100 titles per season
+    if (page > 10) break; // cap at ~250 titles per season
   }
 
   return entries;
+}
+
+
+/**
+ * Fetch watching/completed/dropped/etc. counts for a single title.
+ * Fires on demand (when a user opens the detail panel) — one request per title.
+ */
+export async function fetchAnimeStatistics(id) {
+  const data = await rateLimitedFetch(`${BASE_URL}/anime/${id}/statistics`);
+  const s = data.data;
+  return {
+    watching:      s.watching      ?? 0,
+    completed:     s.completed     ?? 0,
+    on_hold:       s.on_hold       ?? 0,
+    dropped:       s.dropped       ?? 0,
+    plan_to_watch: s.plan_to_watch ?? 0,
+    total:         s.total         ?? 0,
+  };
 }
 
 export async function fetchAvailableSeasons() {

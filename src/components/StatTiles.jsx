@@ -1,5 +1,12 @@
 import { memo } from 'react';
 
+function formatMembers(n) {
+  if (!n) return '—';
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
+  return String(n);
+}
+
 function StatTiles({ stats }) {
   if (!stats) return null;
 
@@ -27,6 +34,18 @@ function StatTiles({ stats }) {
       value: stats.avgScore ? stats.avgScore.toFixed(2) : '—',
       icon: '★',
       colour: '#fbbf24',
+    },
+    {
+      label: 'Most Watched Genre',
+      value: stats.mostWatchedGenre || '—',
+      icon: '◉',
+      colour: '#f472b6',
+    },
+    {
+      label: 'Avg Members / Title',
+      value: formatMembers(stats.avgMembers),
+      icon: '◎',
+      colour: 'var(--accent-teal)',
     },
   ];
 

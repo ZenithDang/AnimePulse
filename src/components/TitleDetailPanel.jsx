@@ -1,9 +1,92 @@
 import { useEffect } from 'react';
 import { getGenreColour } from '../utils/colours';
 import { seasonLabel } from '../utils/transforms';
+import { useAnimeStatistics } from '../hooks/useAnimeStatistics';
+
+function formatMembers(n) {
+  if (!n) return '0';
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
+  return String(n);
+}
+
+const FUNNEL_SEGMENTS = [
+  { key: 'watching',      label: 'Watching',      colour: '#60a5fa' },
+  { key: 'completed',     label: 'Completed',     colour: '#34d399' },
+  { key: 'on_hold',       label: 'On Hold',       colour: '#fbbf24' },
+  { key: 'dropped',       label: 'Dropped',       colour: '#f87171' },
+  { key: 'plan_to_watch', label: 'Plan to Watch', colour: '#a78bfa' },
+];
+
+function CompletionFunnel({ titleId }) {
+  const { stats, isLoading } = useAnimeStatistics(titleId);
+
+  if (isLoading) {
+    return (
+      <div
+        style={{
+          height: '58px',
+          borderRadius: '8px',
+          background: 'rgba(255,255,255,0.04)',
+          border: '0.5px solid var(--border)',
+          animation: 'pulse 1.5s ease-in-out infinite',
+        }}
+      />
+    );
+  }
+
+  if (!stats || stats.total === 0) return null;
+
+  return (
+    <div>
+      <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>Viewership Breakdown</p>
+
+      {/* Segmented bar */}
+      <div
+        className="flex rounded-full overflow-hidden mb-2.5"
+        style={{ height: '10px' }}
+      >
+        {FUNNEL_SEGMENTS.map(({ key, colour }) => {
+          const pct = (stats[key] / stats.total) * 100;
+          if (pct < 0.5) return null;
+          return (
+            <div
+              key={key}
+              style={{
+                width: `${pct}%`,
+                background: colour,
+                minWidth: '3px',
+                borderRight: '1.5px solid rgba(0,0,0,0.25)',
+              }}
+            />
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+        {FUNNEL_SEGMENTS.map(({ key, label, colour }) => {
+          const count = stats[key];
+          if (!count) return null;
+          return (
+            <div key={key} className="flex items-center gap-1.5 text-[10px]">
+              <span
+                className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                style={{ background: colour }}
+              />
+              <span style={{ color: 'var(--text-muted)' }}>{label}</span>
+              <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>
+                {formatMembers(count)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export default function TitleDetailPanel({ title, onClose }) {
-  // Close on Escape
   useEffect(() => {
     if (!title) return;
     const handler = (e) => { if (e.key === 'Escape') onClose(); };
@@ -118,16 +201,15 @@ export default function TitleDetailPanel({ title, onClose }) {
                 style={{ background: 'rgba(52,211,153,0.08)', border: '0.5px solid rgba(52,211,153,0.2)' }}
               >
                 <p className="text-xl font-bold" style={{ color: 'var(--accent-teal)' }}>
-                  {title.members >= 1000000
-                    ? `${(title.members / 1000000).toFixed(1)}M`
-                    : title.members >= 1000
-                    ? `${(title.members / 1000).toFixed(0)}K`
-                    : title.members}
+                  {formatMembers(title.members)}
                 </p>
                 <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Members</p>
               </div>
             )}
           </div>
+
+          {/* Completion funnel */}
+          <CompletionFunnel titleId={title.id} />
 
           {/* Genres */}
           {title.genres?.length > 0 && (

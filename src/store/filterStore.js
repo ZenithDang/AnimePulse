@@ -38,6 +38,9 @@ const defaultRange    = getDefaultRange(6);
 const defaultStart    = defaultRange[0];
 const defaultEnd      = defaultRange[defaultRange.length - 1];
 const DEFAULT_GENRES  = ['Action', 'Comedy', 'Fantasy', 'Romance', 'Drama'];
+const DEFAULT_FORMAT  = 'TV';
+
+export { defaultStart, defaultEnd, DEFAULT_GENRES, DEFAULT_FORMAT };
 
 const useFilterStore = create((set, get) => ({
   startSeason:    defaultStart.season,
@@ -63,6 +66,15 @@ const useFilterStore = create((set, get) => ({
   },
 
   setSelectedGenres: (genres) => set({ selectedGenres: genres }),
+
+  resetFilters: () => set({
+    startSeason:    defaultStart.season,
+    startYear:      defaultStart.year,
+    endSeason:      defaultEnd.season,
+    endYear:        defaultEnd.year,
+    selectedGenres: DEFAULT_GENRES,
+    format:         DEFAULT_FORMAT,
+  }),
 
   /** Returns ordered list of { season, year } in the current range.
    *  Accepts optional overrides so callers can pass debounced values. */

@@ -5,6 +5,9 @@ import {
   buildTrendChartData,
   buildMomentumData,
   buildBreakoutTitles,
+  aggregateViewershipByGenre,
+  buildViewershipTrendData,
+  buildMostWatchedTitles,
 } from '../utils/transforms';
 
 /**
@@ -33,6 +36,21 @@ export function useGenreTrends(entries, seasonRange) {
   const breakoutTitles = useMemo(
     () => buildBreakoutTitles(entries, aggregated),
     [entries, aggregated],
+  );
+
+  const viewershipAggregated = useMemo(
+    () => aggregateViewershipByGenre(entries),
+    [entries],
+  );
+
+  const viewershipTrendData = useMemo(
+    () => buildViewershipTrendData(viewershipAggregated, seasonRange, selectedGenres),
+    [viewershipAggregated, seasonRange, selectedGenres],
+  );
+
+  const mostWatchedTitles = useMemo(
+    () => buildMostWatchedTitles(entries),
+    [entries],
   );
 
   const studioData = useMemo(() => {
@@ -64,13 +82,41 @@ export function useGenreTrends(entries, seasonRange) {
       ? parseFloat((scored.reduce((s, e) => s + e.score, 0) / scored.length).toFixed(2))
       : 0;
 
+    // Viewership stats
+    const withMembers = entries.filter((e) => e.members > 0);
+    const avgMembers = withMembers.length
+      ? Math.round(withMembers.reduce((s, e) => s + e.members, 0) / withMembers.length)
+      : 0;
+    const peakMembers = withMembers.length
+      ? Math.max(...withMembers.map((e) => e.members))
+      : 0;
+    const genreMembers = {};
+    for (const e of entries) {
+      if (!e.members) continue;
+      for (const g of e.genres) genreMembers[g] = (genreMembers[g] || 0) + e.members;
+    }
+    const mostWatchedGenre = Object.entries(genreMembers).sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
+
     return {
       totalTitles:  entries.length,
       seasonsCount: seasonRange.length,
       topGenre,
       avgScore,
+      avgMembers,
+      peakMembers,
+      mostWatchedGenre,
     };
   }, [entries, seasonRange]);
 
-  return { aggregated, trendData, momentumData, breakoutTitles, studioData, stats };
+  return {
+    aggregated,
+    trendData,
+    momentumData,
+    breakoutTitles,
+    studioData,
+    stats,
+    viewershipAggregated,
+    viewershipTrendData,
+    mostWatchedTitles,
+  };
 }
