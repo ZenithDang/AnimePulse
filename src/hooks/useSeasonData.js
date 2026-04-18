@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 import { useQueries } from '@tanstack/react-query';
-import { fetchSeason } from '../api/jikan';
+import { fetchAnilistSeason } from '../api/anilist';
 import useFilterStore from '../store/filterStore';
 import { matchesFormat } from '../utils/transforms';
 import { useDebounce } from './useDebounce';
 
 export function useSeasonData() {
-  const { format, startSeason, startYear, endSeason, endYear, getSeasonRange } = useFilterStore();
+  const { format, startSeason, startYear, endSeason, endYear, includeCurrentSeason, fullData, getSeasonRange } = useFilterStore();
 
   const dStartSeason = useDebounce(startSeason, 400);
   const dStartYear   = useDebounce(startYear,   400);
@@ -17,25 +17,29 @@ export function useSeasonData() {
   // and only recompute when the debounced range actually changes.
   const seasonRange = useMemo(
     () => getSeasonRange(dStartSeason, dStartYear, dEndSeason, dEndYear),
-    [dStartSeason, dStartYear, dEndSeason, dEndYear, getSeasonRange],
+    // includeCurrentSeason is read inside getSeasonRange via get() — listing it
+    // here ensures the memo recomputes when the toggle changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dStartSeason, dStartYear, dEndSeason, dEndYear, includeCurrentSeason, getSeasonRange],
   );
 
   const seasonQueries = useQueries({
     queries: seasonRange.map(({ season, year }) => ({
-      queryKey:  ['season', year, season],
-      queryFn:   () => fetchSeason(year, season),
+      queryKey:  ['season', year, season, fullData ? 'full' : 'top50'],
+      queryFn:   () => fetchAnilistSeason(year, season, fullData),
       staleTime: 10 * 60 * 1000,
       gcTime:    30 * 60 * 1000,
       retry:     2,
     })),
   });
 
-  const isLoading = seasonQueries.some((q) => q.isLoading);
-  const isError   = seasonQueries.some((q) => q.isError);
+  const isLoading   = seasonQueries.some((q) => q.isLoading);
+  const isError     = seasonQueries.some((q) => q.isError);
+  const errorDetail = seasonQueries.find((q) => q.isError)?.error?.message ?? null;
 
   const allEntries = seasonQueries
     .flatMap((q) => q.data || [])
     .filter((entry) => matchesFormat(entry, format));
 
-  return { entries: allEntries, isLoading, isError, seasonRange };
+  return { entries: allEntries, isLoading, isError, errorDetail, seasonRange };
 }

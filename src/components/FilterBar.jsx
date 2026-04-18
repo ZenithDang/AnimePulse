@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import useFilterStore, { SEASONS, defaultStart, defaultEnd, DEFAULT_GENRES, DEFAULT_FORMAT } from '../store/filterStore';
+import useFilterStore, { SEASONS, getCurrentSeason, defaultStart, defaultEnd, DEFAULT_GENRES, DEFAULT_FORMAT } from '../store/filterStore';
 import { useGenres } from '../hooks/useGenres';
 
 const SEASON_LABELS  = { winter: 'Winter', spring: 'Spring', summer: 'Summer', fall: 'Fall' };
@@ -10,13 +10,16 @@ const YEAR_OPTIONS = Array.from(
   (_, i) => 2010 + i,
 ).reverse();
 
-export default function FilterBar() {
+export default function FilterBar({ entries = [], genresLoading = false }) {
   const {
     startSeason, startYear, endSeason, endYear,
-    selectedGenres, format,
+    selectedGenres, format, includeCurrentSeason, fullData,
     setStartSeason, setStartYear, setEndSeason, setEndYear,
-    setFormat, toggleGenre, resetFilters,
+    setFormat, toggleGenre, resetFilters, toggleCurrentSeason, toggleFullData,
   } = useFilterStore();
+
+  const currentSeason = getCurrentSeason();
+  const currentYear   = new Date().getFullYear();
 
   const isDirty = (
     startSeason !== defaultStart.season ||
@@ -24,11 +27,13 @@ export default function FilterBar() {
     endSeason   !== defaultEnd.season   ||
     endYear     !== defaultEnd.year     ||
     format      !== DEFAULT_FORMAT      ||
+    includeCurrentSeason                ||
+    fullData                            ||
     selectedGenres.length !== DEFAULT_GENRES.length ||
     selectedGenres.some((g) => !DEFAULT_GENRES.includes(g))
   );
 
-  const { genres, isLoading: genresLoading } = useGenres();
+  const genres = useGenres(entries);
 
   const [genreOpen,   setGenreOpen]   = useState(false);
   const [genreSearch, setGenreSearch] = useState('');
@@ -113,9 +118,23 @@ export default function FilterBar() {
               season={endSeason} year={endYear}
               onSeasonChange={setEndSeason} onYearChange={setEndYear}
             />
+            <button
+              onClick={toggleCurrentSeason}
+              title={`${includeCurrentSeason ? 'Exclude' : 'Include'} current in-progress season`}
+              className="px-2.5 py-1 text-xs transition-colors"
+              style={{
+                borderRadius: '20px',
+                border: `0.5px solid ${includeCurrentSeason ? 'var(--accent-teal)' : 'var(--border)'}`,
+                background: includeCurrentSeason ? 'rgba(45,212,191,0.12)' : 'transparent',
+                color: includeCurrentSeason ? 'var(--accent-teal)' : 'var(--text-muted)',
+                cursor: 'pointer',
+              }}
+            >
+              + {currentSeason.charAt(0).toUpperCase() + currentSeason.slice(1)} {currentYear}
+            </button>
           </div>
 
-          {/* Format Filter */}
+          {/* Format Filter + Full Data toggle */}
           <div className="flex items-center gap-1 flex-wrap">
             {FORMAT_OPTIONS.map((f) => (
               <button
@@ -133,6 +152,20 @@ export default function FilterBar() {
                 {f}
               </button>
             ))}
+            <button
+              onClick={toggleFullData}
+              title={fullData ? 'Showing all titles — click for top 50 per season' : 'Showing top 50 per season — click to load all titles (slower)'}
+              className="px-3 py-1 text-xs transition-colors"
+              style={{
+                borderRadius: '20px',
+                border: `0.5px solid ${fullData ? 'var(--accent-amber)' : 'var(--border)'}`,
+                background: fullData ? 'rgba(251,191,36,0.12)' : 'transparent',
+                color: fullData ? 'var(--accent-amber)' : 'var(--text-muted)',
+                cursor: 'pointer',
+              }}
+            >
+              {fullData ? 'All titles' : 'Top 50'}
+            </button>
           </div>
 
           {/* Genre Multi-Select */}

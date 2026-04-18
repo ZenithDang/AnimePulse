@@ -42,7 +42,7 @@ function StatTiles({ stats }) {
       colour: '#f472b6',
     },
     {
-      label: 'Avg Members / Title',
+      label: 'Avg Popularity / Title',
       value: formatMembers(stats.avgMembers),
       icon: '◎',
       colour: 'var(--accent-teal)',

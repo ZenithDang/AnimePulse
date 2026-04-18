@@ -1,14 +1,17 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, lazy, Suspense } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
-import FilterBar          from './components/FilterBar';
-import GenreTrendChart    from './components/GenreTrendChart';
-import GenreMomentum      from './components/GenreMomentum';
-import ScoreHeatmap       from './components/ScoreHeatmap';
-import TitleDetailPanel   from './components/TitleDetailPanel';
-import StudioMomentum     from './components/StudioMomentum';
-import StatTiles          from './components/StatTiles';
-import RankedTitlesPanel  from './components/RankedTitlesPanel';
+import FilterBar         from './components/FilterBar';
+import ScoreHeatmap      from './components/ScoreHeatmap';
+import TitleDetailPanel  from './components/TitleDetailPanel';
+import StatTiles         from './components/StatTiles';
+import RankedTitlesPanel from './components/RankedTitlesPanel';
+
+// Recharts-heavy components — split into a separate chunk so the main
+// bundle parses and renders faster on first load.
+const GenreTrendChart = lazy(() => import('./components/GenreTrendChart'));
+const GenreMomentum   = lazy(() => import('./components/GenreMomentum'));
+const StudioMomentum  = lazy(() => import('./components/StudioMomentum'));
 import {
   ChartSkeleton,
   StatTilesSkeleton,
@@ -19,23 +22,31 @@ import {
 
 import { useSeasonData }      from './hooks/useSeasonData';
 import { useGenreTrends }     from './hooks/useGenreTrends';
+import { useUrlSync }         from './hooks/useUrlSync';
 import useFilterStore         from './store/filterStore';
 
 export default function App() {
+  useUrlSync();
+
   const queryClient = useQueryClient();
-  const { entries, isLoading, isError, seasonRange } = useSeasonData();
+  const { entries, isLoading, isError, errorDetail, seasonRange } = useSeasonData();
   const { selectedGenres } = useFilterStore();
 
   const {
     aggregated,
     trendData,
     momentumData,
+    viewershipMomentumData,
+    countMomentumData,
     breakoutTitles,
     studioData,
+    studioPopularityData,
     stats,
     viewershipAggregated,
     viewershipTrendData,
     mostWatchedTitles,
+    countAggregated,
+    countTrendData,
   } = useGenreTrends(entries, seasonRange);
 
   const [selectedTitle, setSelectedTitle] = useState(null);
@@ -60,7 +71,7 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg-base)' }}>
       <LoadingBar visible={isRefetching} />
-      <FilterBar />
+      <FilterBar entries={entries} genresLoading={isLoading} />
 
       {/* Main two-column layout */}
       <main
@@ -72,7 +83,7 @@ export default function App() {
 
           {isError && (
             <ErrorBanner
-              message="Jikan API returned an error. Some seasons may not have loaded."
+              message={`Failed to load season data${errorDetail ? `: ${errorDetail}` : ''}. Some seasons may not have loaded.`}
               onRetry={handleRetry}
             />
           )}
@@ -80,13 +91,17 @@ export default function App() {
           {showSkeleton ? (
             <ChartSkeleton height={300} />
           ) : (
-            <GenreTrendChart
-              trendData={trendData}
-              aggregated={aggregated}
-              viewershipTrendData={viewershipTrendData}
-              viewershipAggregated={viewershipAggregated}
-              onTitleClick={handleTitleClick}
-            />
+            <Suspense fallback={<ChartSkeleton height={300} />}>
+              <GenreTrendChart
+                trendData={trendData}
+                aggregated={aggregated}
+                viewershipTrendData={viewershipTrendData}
+                viewershipAggregated={viewershipAggregated}
+                countTrendData={countTrendData}
+                countAggregated={countAggregated}
+                onTitleClick={handleTitleClick}
+              />
+            </Suspense>
           )}
 
           {showSkeleton ? (
@@ -95,6 +110,7 @@ export default function App() {
             <ScoreHeatmap
               aggregated={aggregated}
               viewershipAggregated={viewershipAggregated}
+              countAggregated={countAggregated}
               seasonRange={seasonRange}
               selectedGenres={selectedGenres}
             />
@@ -103,13 +119,21 @@ export default function App() {
           {showSkeleton ? (
             <ChartSkeleton height={220} />
           ) : (
-            <GenreMomentum momentumData={momentumData} />
+            <Suspense fallback={<ChartSkeleton height={220} />}>
+              <GenreMomentum
+                momentumData={momentumData}
+                viewershipMomentumData={viewershipMomentumData}
+                countMomentumData={countMomentumData}
+              />
+            </Suspense>
           )}
 
           {showSkeleton ? (
             <ChartSkeleton height={200} />
           ) : (
-            <StudioMomentum studioData={studioData} />
+            <Suspense fallback={<ChartSkeleton height={200} />}>
+              <StudioMomentum studioData={studioData} studioPopularityData={studioPopularityData} />
+            </Suspense>
           )}
         </div>
 
@@ -130,6 +154,21 @@ export default function App() {
       </main>
 
       <TitleDetailPanel title={selectedTitle} onClose={handleClosePanel} />
+
+      <footer
+        className="w-full text-center py-3 text-xs"
+        style={{ color: 'var(--text-muted)', borderTop: '0.5px solid var(--border)' }}
+      >
+        Data sourced from{' '}
+        <a
+          href="https://anilist.co"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: 'var(--accent-violet)', textDecoration: 'none' }}
+        >
+          AniList
+        </a>
+      </footer>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import {
   Tooltip, ResponsiveContainer,
 } from 'recharts';
 import useFilterStore from '../store/filterStore';
+import useUiStore from '../store/uiStore';
 import { getGenreColour } from '../utils/colours';
 
 function formatMembers(n) {
@@ -15,12 +16,13 @@ function formatMembers(n) {
 
 function TrendTooltip({
   active, payload, label,
-  aggregated, viewershipAggregated, mode, onTitleClick,
+  aggregated, viewershipAggregated, countAggregated, mode, onTitleClick,
 }) {
   if (!active || !payload?.length) return null;
 
   const seasonKey = payload[0]?.payload?._key;
   const isMembers = mode === 'members';
+  const isCount   = mode === 'titles';
 
   return (
     <div
@@ -42,17 +44,39 @@ function TrendTooltip({
       </p>
       {payload.map((entry) => {
         if (!entry.value) return null;
-        const genre  = entry.dataKey;
+        const genre = entry.dataKey;
+
+        // "All Genres" baseline — label and format depend on the active mode
+        if (genre === '_baseline') {
+          const baselineLabel = isMembers
+            ? `${formatMembers(entry.value)} avg`
+            : isCount
+              ? `${entry.value} title${entry.value !== 1 ? 's' : ''}`
+              : entry.value?.toFixed(2);
+          return (
+            <div key="_baseline" className="mb-2 last:mb-0">
+              <div className="flex items-center justify-between">
+                <span className="font-medium" style={{ color: entry.color }}>All Genres</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{baselineLabel}</span>
+              </div>
+            </div>
+          );
+        }
+
         const titles = isMembers
           ? (viewershipAggregated[seasonKey]?.[genre]?.titles?.slice(0, 3) || [])
-          : (aggregated[seasonKey]?.[genre]?.titles?.slice(0, 3) || []);
+          : isCount ? [] : (aggregated[seasonKey]?.[genre]?.titles?.slice(0, 3) || []);
 
         return (
           <div key={genre} className="mb-2 last:mb-0">
             <div className="flex items-center justify-between mb-1">
               <span className="font-medium" style={{ color: entry.color }}>{genre}</span>
               <span style={{ color: 'var(--text-secondary)' }}>
-                {isMembers ? `${formatMembers(entry.value)} avg` : entry.value?.toFixed(2)}
+                {isMembers
+                  ? `${formatMembers(entry.value)} avg`
+                  : isCount
+                    ? `${entry.value} title${entry.value !== 1 ? 's' : ''}`
+                    : entry.value?.toFixed(2)}
               </span>
             </div>
             {titles.map((title) => (
@@ -78,16 +102,16 @@ function TrendTooltip({
 function GenreTrendChart({
   trendData, aggregated,
   viewershipTrendData, viewershipAggregated,
+  countTrendData, countAggregated,
   onTitleClick,
 }) {
   const { selectedGenres } = useFilterStore();
-  const [mode, setMode]             = useState('score');
+  const { chartMode: mode, setChartMode: setMode } = useUiStore();
   const [hoveredGenre, setHoveredGenre] = useState(null);
 
   const clearHover = useCallback(() => setHoveredGenre(null), []);
 
-  const activeData       = mode === 'score' ? trendData       : viewershipTrendData;
-  const activeAggregated = mode === 'score' ? aggregated      : viewershipAggregated;
+  const activeData = mode === 'score' ? trendData : mode === 'members' ? viewershipTrendData : countTrendData;
 
   const tooltipContent = useCallback(
     (props) => (
@@ -95,21 +119,25 @@ function GenreTrendChart({
         {...props}
         aggregated={aggregated}
         viewershipAggregated={viewershipAggregated}
+        countAggregated={countAggregated}
         mode={mode}
         onTitleClick={onTitleClick}
       />
     ),
-    [aggregated, viewershipAggregated, mode, onTitleClick],
+    [aggregated, viewershipAggregated, countAggregated, mode, onTitleClick],
   );
 
   const enterHandlers = useMemo(
-    () => Object.fromEntries(selectedGenres.map((g) => [g, () => setHoveredGenre(g)])),
+    () => Object.fromEntries(
+      [...selectedGenres, '_baseline'].map((g) => [g, () => setHoveredGenre(g)])
+    ),
     [selectedGenres],
   );
 
   if (!activeData?.length) return null;
 
   const isMembers = mode === 'members';
+  const isCount   = mode === 'titles';
 
   return (
     <div
@@ -122,6 +150,11 @@ function GenreTrendChart({
           Genre Trends
         </h2>
 
+        <div className="flex items-center gap-3">
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            {isMembers ? 'Avg AniList members per title' : isCount ? 'Total titles per season' : 'Avg score per title'}
+          </span>
+
         {/* Tab toggle */}
         <div
           className="flex gap-0.5 p-0.5"
@@ -133,7 +166,8 @@ function GenreTrendChart({
         >
           {[
             { key: 'score',   label: 'Score' },
-            { key: 'members', label: 'Members' },
+            { key: 'members', label: 'Popularity' },
+            { key: 'titles',  label: 'Titles' },
           ].map(({ key, label }) => (
             <button
               key={key}
@@ -150,6 +184,7 @@ function GenreTrendChart({
               {label}
             </button>
           ))}
+        </div>
         </div>
       </div>
 
@@ -170,10 +205,16 @@ function GenreTrendChart({
               tickLine={false}
               width={45}
             />
+          ) : isCount ? (
+            <YAxis
+              allowDecimals={false}
+              tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+            />
           ) : (
             <YAxis
-              domain={[6, 10]}
-              ticks={[6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10]}
+              domain={['auto', 'auto']}
               tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
               axisLine={false}
               tickLine={false}
@@ -201,6 +242,20 @@ function GenreTrendChart({
               />
             );
           })}
+          <Line
+            key="_baseline"
+            type="monotone"
+            dataKey="_baseline"
+            stroke="rgba(255,255,255,0.4)"
+            strokeWidth={hoveredGenre === '_baseline' ? 2 : 1.5}
+            strokeDasharray="5 3"
+            dot={{ fill: 'rgba(255,255,255,0.4)', r: 2, strokeWidth: 0 }}
+            activeDot={{ r: 4, strokeWidth: 0 }}
+            connectNulls
+            opacity={hoveredGenre && hoveredGenre !== '_baseline' ? 0.2 : 1}
+            onMouseEnter={enterHandlers['_baseline']}
+            style={{ transition: 'opacity 0.2s' }}
+          />
         </LineChart>
       </ResponsiveContainer>
 
@@ -220,6 +275,20 @@ function GenreTrendChart({
             {genre}
           </div>
         ))}
+        <div
+          className="flex items-center gap-1.5 text-xs cursor-pointer"
+          style={{ color: hoveredGenre === '_baseline' ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)' }}
+          onMouseEnter={enterHandlers['_baseline']}
+          onMouseLeave={clearHover}
+        >
+          {/* Dashed line indicator */}
+          <span className="inline-flex items-center w-3" style={{ height: '2px', gap: '1px' }}>
+            <span className="inline-block h-px w-1.5" style={{ background: 'rgba(255,255,255,0.4)' }} />
+            <span className="inline-block h-px w-0.5" style={{ background: 'transparent' }} />
+            <span className="inline-block h-px w-0.5" style={{ background: 'rgba(255,255,255,0.4)' }} />
+          </span>
+          All Genres
+        </div>
       </div>
     </div>
   );

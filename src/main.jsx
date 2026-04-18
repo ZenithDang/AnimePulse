@@ -1,24 +1,36 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 import './index.css';
 import App from './App.jsx';
+
+const CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24 h
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime:  10 * 60 * 1000,
-      gcTime:     30 * 60 * 1000,
+      staleTime:  10 * 60 * 1000, // 10 min — fresh window, no refetch
+      gcTime:     CACHE_MAX_AGE,  // must be >= persister maxAge
       retry:      2,
       retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
     },
   },
 });
 
+const persister = createSyncStoragePersister({
+  storage: window.localStorage,
+  key:     'animepulse-cache-v2', // increment on breaking entry schema changes
+});
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{ persister, maxAge: CACHE_MAX_AGE }}
+    >
       <App />
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   </StrictMode>,
 );

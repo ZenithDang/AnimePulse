@@ -8,6 +8,8 @@ import {
   aggregateViewershipByGenre,
   buildViewershipTrendData,
   buildMostWatchedTitles,
+  aggregateCountByGenre,
+  buildCountChartData,
 } from '../utils/transforms';
 
 /**
@@ -23,9 +25,46 @@ export function useGenreTrends(entries, seasonRange) {
     [entries],
   );
 
+  // Per-season baseline values for the "All anime" reference line.
+  // Defined early so trendData, viewershipTrendData, and countTrendData can all depend on it.
+  const baselineBySeasonMap = useMemo(() => {
+    const countMap   = {};
+    const scoreMap   = {};
+    const membersMap = {};
+
+    for (const entry of entries) {
+      const key = `${entry.season}-${entry.year}`;
+
+      countMap[key] = (countMap[key] || 0) + 1;
+
+      if (entry.score) {
+        if (!scoreMap[key]) scoreMap[key] = { sum: 0, count: 0 };
+        scoreMap[key].sum   += entry.score;
+        scoreMap[key].count += 1;
+      }
+
+      if (entry.members) {
+        if (!membersMap[key]) membersMap[key] = { sum: 0, count: 0 };
+        membersMap[key].sum   += entry.members;
+        membersMap[key].count += 1;
+      }
+    }
+
+    return {
+      count:   countMap,
+      score:   Object.fromEntries(
+        Object.entries(scoreMap).map(([k, v]) => [k, parseFloat((v.sum / v.count).toFixed(2))]),
+      ),
+      members: Object.fromEntries(
+        Object.entries(membersMap).map(([k, v]) => [k, Math.round(v.sum / v.count)]),
+      ),
+    };
+  }, [entries]);
+
   const trendData = useMemo(
-    () => buildTrendChartData(aggregated, seasonRange, selectedGenres),
-    [aggregated, seasonRange, selectedGenres],
+    () => buildTrendChartData(aggregated, seasonRange, selectedGenres)
+      .map((point) => ({ ...point, _baseline: baselineBySeasonMap.score[point._key] ?? null })),
+    [aggregated, seasonRange, selectedGenres, baselineBySeasonMap],
   );
 
   const momentumData = useMemo(
@@ -44,13 +83,35 @@ export function useGenreTrends(entries, seasonRange) {
   );
 
   const viewershipTrendData = useMemo(
-    () => buildViewershipTrendData(viewershipAggregated, seasonRange, selectedGenres),
+    () => buildViewershipTrendData(viewershipAggregated, seasonRange, selectedGenres)
+      .map((point) => ({ ...point, _baseline: baselineBySeasonMap.members[point._key] ?? null })),
+    [viewershipAggregated, seasonRange, selectedGenres, baselineBySeasonMap],
+  );
+
+  const viewershipMomentumData = useMemo(
+    () => buildMomentumData(viewershipAggregated, seasonRange, selectedGenres, (d) => d?.avgMembers),
     [viewershipAggregated, seasonRange, selectedGenres],
   );
 
   const mostWatchedTitles = useMemo(
     () => buildMostWatchedTitles(entries),
     [entries],
+  );
+
+  const countAggregated = useMemo(
+    () => aggregateCountByGenre(entries),
+    [entries],
+  );
+
+  const countTrendData = useMemo(
+    () => buildCountChartData(countAggregated, seasonRange, selectedGenres)
+      .map((point) => ({ ...point, _baseline: baselineBySeasonMap.count[point._key] ?? 0 })),
+    [countAggregated, seasonRange, selectedGenres, baselineBySeasonMap],
+  );
+
+  const countMomentumData = useMemo(
+    () => buildMomentumData(countAggregated, seasonRange, selectedGenres, (d) => d),
+    [countAggregated, seasonRange, selectedGenres],
   );
 
   const studioData = useMemo(() => {
@@ -68,6 +129,25 @@ export function useGenreTrends(entries, seasonRange) {
       }))
       .filter((s) => s.count >= 2)
       .sort((a, b) => b.avg - a.avg)
+      .slice(0, 15);
+  }, [entries]);
+
+  const studioPopularityData = useMemo(() => {
+    const map = {};
+    for (const entry of entries) {
+      if (!entry.members || !entry.studio) continue;
+      if (!map[entry.studio]) map[entry.studio] = { members: [], count: 0 };
+      map[entry.studio].members.push(entry.members);
+      map[entry.studio].count++;
+    }
+    return Object.entries(map)
+      .map(([studio, { members, count }]) => ({
+        studio,
+        avgMembers: Math.round(members.reduce((s, v) => s + v, 0) / members.length),
+        count,
+      }))
+      .filter((s) => s.count >= 2)
+      .sort((a, b) => b.avgMembers - a.avgMembers)
       .slice(0, 15);
   }, [entries]);
 
@@ -112,11 +192,16 @@ export function useGenreTrends(entries, seasonRange) {
     aggregated,
     trendData,
     momentumData,
+    viewershipMomentumData,
+    countMomentumData,
     breakoutTitles,
     studioData,
+    studioPopularityData,
     stats,
     viewershipAggregated,
     viewershipTrendData,
     mostWatchedTitles,
+    countAggregated,
+    countTrendData,
   };
 }

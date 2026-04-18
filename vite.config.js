@@ -7,4 +7,13 @@ export default defineConfig({
     tailwindcss(),
     react(),
   ],
+  server: {
+    proxy: {
+      '/anilist-gql': {
+        target:       'https://graphql.anilist.co',
+        changeOrigin: true,
+        rewrite:      (path) => path.replace(/^\/anilist-gql/, ''),
+      },
+    },
+  },
 })

@@ -131,7 +131,7 @@ function TitleRow({ title, idx, mode, highlightedId, onTitleClick }) {
 
 const TABS = [
   { key: 'breakout',     label: 'Breakout',     subtitle: 'Above genre avg' },
-  { key: 'mostWatched',  label: 'Most Watched',  subtitle: 'By MAL members'  },
+  { key: 'mostWatched',  label: 'Most Watched',  subtitle: 'By AniList members'  },
 ];
 
 function RankedTitlesPanel({ breakoutTitles, mostWatchedTitles, highlightedId, onTitleClick }) {

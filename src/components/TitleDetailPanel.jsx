@@ -125,8 +125,8 @@ export default function TitleDetailPanel({ title, onClose }) {
           className="relative flex-shrink-0"
           style={{
             height: '180px',
-            background: title.image
-              ? `url(${title.image}) center/cover no-repeat`
+            background: title.imageLarge
+              ? `url(${title.imageLarge}) center/cover no-repeat`
               : `linear-gradient(135deg, ${getGenreColour(title.genres?.[0] || '')}33, var(--bg-base))`,
           }}
         >
@@ -192,7 +192,7 @@ export default function TitleDetailPanel({ title, onClose }) {
                 <p className="text-xl font-bold" style={{ color: 'var(--accent-violet)' }}>
                   {title.score.toFixed(2)}
                 </p>
-                <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>MAL Score</p>
+                <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>AniList Score</p>
               </div>
             )}
             {title.members > 0 && (
@@ -203,13 +203,13 @@ export default function TitleDetailPanel({ title, onClose }) {
                 <p className="text-xl font-bold" style={{ color: 'var(--accent-teal)' }}>
                   {formatMembers(title.members)}
                 </p>
-                <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Members</p>
+                <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Popularity</p>
               </div>
             )}
           </div>
 
           {/* Completion funnel */}
-          <CompletionFunnel titleId={title.id} />
+          <CompletionFunnel titleId={title.anilistId} />
 
           {/* Genres */}
           {title.genres?.length > 0 && (
@@ -238,10 +238,9 @@ export default function TitleDetailPanel({ title, onClose }) {
             </p>
           </div>
 
-          {/* MAL Link */}
-          {title.malUrl && (
+          {title.anilistUrl && (
             <a
-              href={title.malUrl}
+              href={title.anilistUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 p-2.5 text-xs font-medium transition-colors mt-auto"
@@ -253,7 +252,7 @@ export default function TitleDetailPanel({ title, onClose }) {
                 textDecoration: 'none',
               }}
             >
-              View on MyAnimeList ↗
+              View on AniList ↗
             </a>
           )}
         </div>

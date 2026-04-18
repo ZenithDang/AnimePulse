@@ -1,9 +1,10 @@
 import { normaliseAnilistEntry } from '../utils/transforms';
+import { apiQueue } from '../utils/requestQueue';
 
-const BASE_URL = 'https://graphql.anilist.co';
+const BASE_URL = '/anilist-gql';
 
 const SEASON_QUERY = `
-  query ($season: MediaSeason, $seasonYear: Int, $page: Int, $format: MediaFormat) {
+  query ($season: MediaSeason, $seasonYear: Int, $page: Int) {
     Page(page: $page, perPage: 50) {
       pageInfo {
         hasNextPage
@@ -12,7 +13,7 @@ const SEASON_QUERY = `
         season: $season,
         seasonYear: $seasonYear,
         type: ANIME,
-        format: $format,
+        isAdult: false,
         sort: POPULARITY_DESC
       ) {
         id
@@ -23,11 +24,10 @@ const SEASON_QUERY = `
         episodes
         meanScore
         popularity
-        favourites
         season
         seasonYear
         description(asHtml: false)
-        coverImage { large }
+        coverImage { extraLarge large }
         studios(isMain: true) { nodes { name } }
       }
     }
@@ -41,12 +41,28 @@ const JIKAN_TO_ANILIST_SEASON = {
   fall:   'FALL',
 };
 
-async function graphqlFetch(query, variables) {
-  const response = await fetch(BASE_URL, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ query, variables }),
-  });
+async function graphqlFetch(query, variables, attempt = 1) {
+  const MAX_ATTEMPTS = 3;
+
+  // Each HTTP request goes through the shared queue (max 3 concurrent).
+  // Retries call graphqlFetch recursively AFTER the slot is freed, so
+  // there is no risk of the queue deadlocking on rate-limited retries.
+  const response = await apiQueue.run(() =>
+    fetch(BASE_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ query, variables }),
+    })
+  );
+
+  if (response.status === 429) {
+    if (attempt >= MAX_ATTEMPTS) {
+      throw new Error(`AniList rate limit exceeded after ${MAX_ATTEMPTS} attempts`);
+    }
+    const retryAfter = parseInt(response.headers.get('Retry-After') ?? '60', 10);
+    await new Promise((r) => setTimeout(r, retryAfter * 1000));
+    return graphqlFetch(query, variables, attempt + 1);
+  }
 
   if (!response.ok) {
     throw new Error(`AniList API error: ${response.status}`);
@@ -59,52 +75,75 @@ async function graphqlFetch(query, variables) {
   return json.data;
 }
 
-/**
- * Fetch AniList data for a given season as enrichment data.
- * Keyed by MAL ID for easy merging.
- */
-export async function fetchAnilistSeason(year, season, format = 'TV') {
-  const anilistSeason = JIKAN_TO_ANILIST_SEASON[season];
-  if (!anilistSeason) return {};
-
-  const formatMap = { TV: 'TV', Movie: 'MOVIE', OVA: 'OVA', ONA: 'ONA' };
-  const anilistFormat = formatMap[format];
-
-  try {
-    const data = await graphqlFetch(SEASON_QUERY, {
-      season:     anilistSeason,
-      seasonYear: year,
-      page:       1,
-      format:     anilistFormat,
-    });
-
-    const entries = (data?.Page?.media || []).map(normaliseAnilistEntry);
-    const byMalId = {};
-    for (const e of entries) {
-      if (e.id) byMalId[e.id] = e;
+const STATISTICS_QUERY = `
+  query ($id: Int) {
+    Media(id: $id, type: ANIME) {
+      stats {
+        statusDistribution {
+          status
+          amount
+        }
+      }
     }
-    return byMalId;
-  } catch {
-    // AniList is supplementary — fail silently
-    return {};
   }
+`;
+
+const ANILIST_STATUS_MAP = {
+  CURRENT:   'watching',
+  COMPLETED: 'completed',
+  PAUSED:    'on_hold',
+  DROPPED:   'dropped',
+  PLANNING:  'plan_to_watch',
+};
+
+/**
+ * Fetch viewership status breakdown for a single title by AniList ID.
+ * Returns the same shape as the old Jikan statistics endpoint.
+ */
+export async function fetchAnilistStatistics(anilistId) {
+  const data = await graphqlFetch(STATISTICS_QUERY, { id: anilistId });
+  const dist = data?.Media?.stats?.statusDistribution ?? [];
+
+  const stats = { watching: 0, completed: 0, on_hold: 0, dropped: 0, plan_to_watch: 0, total: 0 };
+  for (const { status, amount } of dist) {
+    const key = ANILIST_STATUS_MAP[status];
+    if (key) {
+      stats[key]   = amount;
+      stats.total += amount;
+    }
+  }
+  return stats;
 }
 
 /**
- * Merge AniList enrichment into Jikan entries.
- * Uses AniList popularity as a secondary members signal when Jikan's is low.
+ * Fetch anime for a given season from AniList.
+ * fullData=false (default): fetches only the first page (top 50 by popularity) for fast load times.
+ * fullData=true: paginates through all pages for complete season data.
  */
-export function mergeWithAnilist(jikanEntries, anilistMap) {
-  return jikanEntries.map((entry) => {
-    const anilist = anilistMap[entry.id];
-    if (!anilist) return entry;
+export async function fetchAnilistSeason(year, season, fullData = false) {
+  const anilistSeason = JIKAN_TO_ANILIST_SEASON[season];
+  if (!anilistSeason) return [];
 
-    return {
-      ...entry,
-      // Use whichever popularity signal is higher
-      members: Math.max(entry.members, anilist.members),
-      // Fill missing synopsis from AniList
-      synopsis: entry.synopsis || anilist.synopsis,
-    };
-  });
+  const entries = [];
+  let page    = 1;
+  let hasNext = true;
+
+  while (hasNext) {
+    const data = await graphqlFetch(SEASON_QUERY, {
+      season:     anilistSeason,
+      seasonYear: year,
+      page,
+    });
+
+    const pageEntries = (data?.Page?.media || []).map(normaliseAnilistEntry);
+    entries.push(...pageEntries);
+
+    hasNext = data?.Page?.pageInfo?.hasNextPage ?? false;
+    page++;
+
+    if (!fullData) break;              // top-50 mode: stop after first page
+    if (page > 10) break;             // safety cap (~500 titles per season)
+  }
+
+  return entries;
 }

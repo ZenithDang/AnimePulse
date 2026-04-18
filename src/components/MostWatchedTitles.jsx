@@ -44,7 +44,7 @@ function MostWatchedTitles({ titles, highlightedId, onTitleClick }) {
           Most Watched Titles
         </h2>
         <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          By MAL members
+          By AniList popularity
         </span>
       </div>
 

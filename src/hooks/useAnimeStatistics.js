@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchAnimeStatistics } from '../api/jikan';
+import { fetchAnilistStatistics } from '../api/anilist';
 
-export function useAnimeStatistics(id) {
+export function useAnimeStatistics(anilistId) {
   const { data, isLoading } = useQuery({
-    queryKey: ['animeStats', id],
-    queryFn:  () => fetchAnimeStatistics(id),
-    enabled:  !!id,
+    queryKey: ['animeStats', anilistId],
+    queryFn:  () => fetchAnilistStatistics(anilistId),
+    enabled:  !!anilistId,
     staleTime: 10 * 60 * 1000,
-    gcTime:    30 * 60 * 1000,
+    gcTime:    24 * 60 * 60 * 1000, // match persister maxAge so stats survive page refreshes
     retry: 1,
   });
 

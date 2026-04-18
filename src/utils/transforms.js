@@ -1,32 +1,8 @@
-/**
- * Normalise a raw Jikan season entry into the internal data model.
- */
-export function normaliseJikanEntry(entry, season, year) {
-  const genres = (entry.genres || [])
-    .concat(entry.themes || [])
-    .map((g) => g.name)
-    .filter(Boolean);
-
-  const studio =
-    entry.studios?.[0]?.name ||
-    entry.producers?.[0]?.name ||
-    'Unknown Studio';
-
-  return {
-    id:       entry.mal_id,
-    title:    entry.title_english || entry.title || 'Unknown Title',
-    score:    entry.score ?? null,
-    members:  entry.members ?? 0,
-    genres,
-    studio,
-    season,
-    year,
-    episodes: entry.episodes ?? null,
-    type:     entry.type || 'TV',
-    image:    entry.images?.jpg?.image_url || null,
-    synopsis: entry.synopsis || '',
-    malUrl:   entry.url || `https://myanimelist.net/anime/${entry.mal_id}`,
-  };
+function decodeHtmlEntities(str) {
+  if (!str) return '';
+  const el = document.createElement('textarea');
+  el.innerHTML = str;
+  return el.value;
 }
 
 /**
@@ -38,7 +14,8 @@ export function normaliseAnilistEntry(entry) {
   const year   = entry.seasonYear || null;
 
   return {
-    id:       entry.idMal || entry.id,
+    id:        entry.idMal || entry.id,
+    anilistId: entry.id,
     title:    entry.title?.english || entry.title?.romaji || 'Unknown Title',
     score:    entry.meanScore ? entry.meanScore / 10 : null,
     members:  entry.popularity ?? 0,
@@ -48,11 +25,10 @@ export function normaliseAnilistEntry(entry) {
     year,
     episodes: entry.episodes ?? null,
     type:     entry.format || 'TV',
-    image:    entry.coverImage?.large || null,
-    synopsis: entry.description?.replace(/<[^>]*>/g, '') || '',
-    malUrl:   entry.idMal
-      ? `https://myanimelist.net/anime/${entry.idMal}`
-      : `https://anilist.co/anime/${entry.id}`,
+    image:      entry.coverImage?.large      || null,
+    imageLarge: entry.coverImage?.extraLarge || entry.coverImage?.large || null,
+    synopsis: decodeHtmlEntities(entry.description?.replace(/<[^>]*>/g, '') ?? ''),
+    anilistUrl: `https://anilist.co/anime/${entry.id}`,
   };
 }
 
@@ -125,9 +101,11 @@ export function buildTrendChartData(aggregated, seasons, selectedGenres) {
 }
 
 /**
- * Build momentum data: % change in avg score per genre across the range.
+ * Build momentum data: % change in a metric per genre across the range.
+ * getValue extracts the numeric value from an aggregated cell.
+ * Defaults to score avg; pass different extractors for popularity or count.
  */
-export function buildMomentumData(aggregated, seasons, selectedGenres) {
+export function buildMomentumData(aggregated, seasons, selectedGenres, getValue = (d) => d?.avg) {
   if (seasons.length < 2) return [];
 
   const firstKey = `${seasons[0].season}-${seasons[0].year}`;
@@ -135,9 +113,9 @@ export function buildMomentumData(aggregated, seasons, selectedGenres) {
 
   return selectedGenres
     .map((genre) => {
-      const first = aggregated[firstKey]?.[genre]?.avg;
-      const last  = aggregated[lastKey]?.[genre]?.avg;
-      if (!first || !last) return null;
+      const first = getValue(aggregated[firstKey]?.[genre]);
+      const last  = getValue(aggregated[lastKey]?.[genre]);
+      if (first == null || last == null) return null;
       const change = parseFloat(((last - first) / first * 100).toFixed(1));
       return { genre, change, first, last };
     })
@@ -200,7 +178,38 @@ export function buildViewershipTrendData(viewershipAggregated, seasons, selected
 }
 
 /**
- * Top titles ranked by MAL member count.
+ * Aggregate raw title counts by genre per season (all entries, regardless of score).
+ * Returns: { [seasonKey]: { [genre]: count } }
+ */
+export function aggregateCountByGenre(entries) {
+  const map = {};
+  for (const entry of entries) {
+    const key = `${entry.season}-${entry.year}`;
+    if (!map[key]) map[key] = {};
+    for (const genre of entry.genres) {
+      map[key][genre] = (map[key][genre] || 0) + 1;
+    }
+  }
+  return map;
+}
+
+/**
+ * Build chart-ready data for a title-count trend (number of titles per genre per season).
+ */
+export function buildCountChartData(countAggregated, seasons, selectedGenres) {
+  return seasons.map(({ season, year }) => {
+    const key   = `${season}-${year}`;
+    const label = seasonLabel(season, year);
+    const point = { season: label, _key: key };
+    for (const genre of selectedGenres) {
+      point[genre] = countAggregated[key]?.[genre] ?? null;
+    }
+    return point;
+  });
+}
+
+/**
+ * Top titles ranked by AniList popularity.
  */
 export function buildMostWatchedTitles(entries, limit = 10) {
   return [...entries]

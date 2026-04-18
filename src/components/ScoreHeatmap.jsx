@@ -11,12 +11,12 @@ function formatMembers(n) {
 /** Opacity-based cell colour — accent colour scales from 12% to 85% opacity */
 function cellColour(t, mode) {
   const opacity = 0.12 + t * 0.73;
-  return mode === 'score'
-    ? `rgba(167, 139, 250, ${opacity.toFixed(2)})` // violet
-    : `rgba(45, 212, 191, ${opacity.toFixed(2)})`; // teal
+  if (mode === 'score')   return `rgba(167, 139, 250, ${opacity.toFixed(2)})`; // violet
+  if (mode === 'members') return `rgba(45, 212, 191, ${opacity.toFixed(2)})`;  // teal
+  return `rgba(251, 146, 60, ${opacity.toFixed(2)})`;                          // orange
 }
 
-const HeatCell = memo(function HeatCell({ genre, season, year, data, mode, membersBounds }) {
+const HeatCell = memo(function HeatCell({ genre, season, year, data, mode, membersBounds, countBounds }) {
   const [hover, setHover] = useState(false);
 
   if (!data) {
@@ -31,15 +31,21 @@ const HeatCell = memo(function HeatCell({ genre, season, year, data, mode, membe
 
   if (mode === 'score') {
     const { avg, count } = data;
-    t            = Math.max(0, Math.min(1, (avg - 6) / 3));
-    displayValue = avg?.toFixed(1);
+    t             = Math.max(0, Math.min(1, (avg - 6) / 3));
+    displayValue  = avg?.toFixed(1);
     tooltipDetail = `Avg: ${avg?.toFixed(2)} · ${count} title${count !== 1 ? 's' : ''}`;
-  } else {
+  } else if (mode === 'members') {
     const { avgMembers, count } = data;
     const { min, max } = membersBounds;
-    t            = max > min ? Math.max(0, Math.min(1, (avgMembers - min) / (max - min))) : 0;
-    displayValue = formatMembers(avgMembers);
+    t             = max > min ? Math.max(0, Math.min(1, (avgMembers - min) / (max - min))) : 0;
+    displayValue  = formatMembers(avgMembers);
     tooltipDetail = `Avg: ${formatMembers(avgMembers)} · ${count} title${count !== 1 ? 's' : ''}`;
+  } else {
+    const count = data;
+    const { min, max } = countBounds;
+    t             = max > min ? Math.max(0, Math.min(1, (count - min) / (max - min))) : 0;
+    displayValue  = String(count);
+    tooltipDetail = `${count} title${count !== 1 ? 's' : ''}`;
   }
 
   const bg = cellColour(t, mode);
@@ -84,7 +90,7 @@ const HeatCell = memo(function HeatCell({ genre, season, year, data, mode, membe
   );
 });
 
-function ScoreHeatmap({ aggregated, viewershipAggregated, seasonRange, selectedGenres }) {
+function ScoreHeatmap({ aggregated, viewershipAggregated, countAggregated, seasonRange, selectedGenres }) {
   const [mode, setMode] = useState('score');
 
   // Compute min/max across visible cells for relative members normalisation
@@ -99,13 +105,27 @@ function ScoreHeatmap({ aggregated, viewershipAggregated, seasonRange, selectedG
     return { min: min === Infinity ? 0 : min, max: max === -Infinity ? 1 : max };
   }, [viewershipAggregated, selectedGenres, seasonRange]);
 
+  const countBounds = useMemo(() => {
+    let min = Infinity, max = -Infinity;
+    for (const genre of selectedGenres) {
+      for (const { season, year } of seasonRange) {
+        const val = countAggregated[`${season}-${year}`]?.[genre];
+        if (val) { min = Math.min(min, val); max = Math.max(max, val); }
+      }
+    }
+    return { min: min === Infinity ? 0 : min, max: max === -Infinity ? 1 : max };
+  }, [countAggregated, selectedGenres, seasonRange]);
+
   if (!aggregated || !seasonRange?.length || !selectedGenres?.length) return null;
 
   const isMembers        = mode === 'members';
-  const activeAggregated = isMembers ? viewershipAggregated : aggregated;
+  const isCount          = mode === 'titles';
+  const activeAggregated = isCount ? countAggregated : isMembers ? viewershipAggregated : aggregated;
   const gradientStyle = isMembers
     ? 'linear-gradient(to right, rgba(45,212,191,0.12), rgba(45,212,191,0.85))'
-    : 'linear-gradient(to right, rgba(167,139,250,0.12), rgba(167,139,250,0.85))';
+    : isCount
+      ? 'linear-gradient(to right, rgba(251,146,60,0.12), rgba(251,146,60,0.85))'
+      : 'linear-gradient(to right, rgba(167,139,250,0.12), rgba(167,139,250,0.85))';
 
   return (
     <div
@@ -123,16 +143,19 @@ function ScoreHeatmap({ aggregated, viewershipAggregated, seasonRange, selectedG
         </h2>
 
         <div className="flex items-center gap-3">
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            {isMembers ? 'Avg AniList members per title' : isCount ? 'Total titles per season' : 'Avg score per title'}
+          </span>
+
           {/* Legend */}
           <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-            <span>Low</span>
+            <span>
+              {isMembers ? formatMembers(membersBounds.min) : isCount ? countBounds.min : '6.0'}
+            </span>
             <div className="h-2 rounded-full" style={{ width: '60px', background: gradientStyle }} />
-            <span>High</span>
-            {isMembers && (
-              <span className="text-[10px]" style={{ color: 'var(--text-muted)', opacity: 0.7 }}>
-                (relative)
-              </span>
-            )}
+            <span>
+              {isMembers ? formatMembers(membersBounds.max) : isCount ? countBounds.max : '9.0'}
+            </span>
           </div>
 
           {/* Tab toggle */}
@@ -145,8 +168,9 @@ function ScoreHeatmap({ aggregated, viewershipAggregated, seasonRange, selectedG
             }}
           >
             {[
-              { key: 'score',   label: 'Score'   },
-              { key: 'members', label: 'Members' },
+              { key: 'score',   label: 'Score'      },
+              { key: 'members', label: 'Popularity' },
+              { key: 'titles',  label: 'Titles'     },
             ].map(({ key, label }) => (
               <button
                 key={key}
@@ -204,6 +228,7 @@ function ScoreHeatmap({ aggregated, viewershipAggregated, seasonRange, selectedG
                   data={data}
                   mode={mode}
                   membersBounds={membersBounds}
+                  countBounds={countBounds}
                 />
               );
             })}

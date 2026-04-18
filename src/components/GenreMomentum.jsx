@@ -1,7 +1,19 @@
 import { memo } from 'react';
+import useUiStore from '../store/uiStore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer } from 'recharts';
 
-function MomentumTooltip({ active, payload }) {
+function formatValue(value, mode) {
+  if (value == null) return '—';
+  if (mode === 'members') {
+    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+    if (value >= 1_000)     return `${Math.round(value / 1_000)}K`;
+    return String(value);
+  }
+  if (mode === 'titles') return `${value} title${value !== 1 ? 's' : ''}`;
+  return value.toFixed(2);
+}
+
+function MomentumTooltip({ active, payload, mode }) {
   if (!active || !payload?.[0]) return null;
   const { genre, change, first, last } = payload[0].payload;
   return (
@@ -16,7 +28,7 @@ function MomentumTooltip({ active, payload }) {
     >
       <p className="font-medium mb-1" style={{ color: 'var(--text-primary)' }}>{genre}</p>
       <p style={{ color: 'var(--text-secondary)' }}>
-        {first?.toFixed(2)} → {last?.toFixed(2)}
+        {formatValue(first, mode)} → {formatValue(last, mode)}
       </p>
       <p style={{ color: change >= 0 ? 'var(--accent-teal)' : 'var(--accent-amber)' }}>
         {change >= 0 ? '+' : ''}{change}%
@@ -25,8 +37,26 @@ function MomentumTooltip({ active, payload }) {
   );
 }
 
-function GenreMomentum({ momentumData }) {
-  if (!momentumData?.length) return null;
+const MODES = [
+  { key: 'score',   label: 'Score'      },
+  { key: 'members', label: 'Popularity' },
+  { key: 'titles',  label: 'Titles'     },
+];
+
+const SUBTITLES = {
+  score:   'Score % change over period',
+  members: 'AniList members % change over period',
+  titles:  'Title count % change over period',
+};
+
+function GenreMomentum({ momentumData, viewershipMomentumData, countMomentumData }) {
+  const { momentumMode: mode, setMomentumMode: setMode } = useUiStore();
+
+  const activeData = mode === 'score' ? momentumData
+    : mode === 'members' ? viewershipMomentumData
+    : countMomentumData;
+
+  if (!activeData?.length) return null;
 
   return (
     <div
@@ -38,21 +68,47 @@ function GenreMomentum({ momentumData }) {
       }}
     >
       <div className="flex items-center justify-between mb-4">
-        <h2
-          className="text-sm font-medium"
-          style={{ color: 'var(--text-primary)', margin: 0 }}
-        >
+        <h2 className="text-sm font-medium" style={{ color: 'var(--text-primary)', margin: 0 }}>
           Genre Momentum
         </h2>
-        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          Score % change over period
-        </span>
+
+        <div className="flex items-center gap-3">
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            {SUBTITLES[mode]}
+          </span>
+
+          <div
+            className="flex gap-0.5 p-0.5"
+            style={{
+              background: 'rgba(255,255,255,0.05)',
+              border: '0.5px solid var(--border)',
+              borderRadius: '8px',
+            }}
+          >
+            {MODES.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setMode(key)}
+                className="text-xs px-3 py-1 rounded transition-all"
+                style={{
+                  background: mode === key ? 'var(--accent-violet)' : 'transparent',
+                  color:      mode === key ? '#fff' : 'var(--text-muted)',
+                  border:     'none',
+                  cursor:     'pointer',
+                  fontWeight: mode === key ? 600 : 400,
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={Math.max(200, momentumData.length * 36)}>
+      <ResponsiveContainer width="100%" height={Math.max(200, activeData.length * 36)}>
         <BarChart
           layout="vertical"
-          data={momentumData}
+          data={activeData}
           margin={{ top: 0, right: 40, left: 0, bottom: 0 }}
           barCategoryGap="30%"
         >
@@ -76,9 +132,9 @@ function GenreMomentum({ momentumData }) {
             tickLine={false}
             width={80}
           />
-          <Tooltip content={<MomentumTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+          <Tooltip content={(props) => <MomentumTooltip {...props} mode={mode} />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
           <Bar dataKey="change" radius={[0, 4, 4, 0]}>
-            {momentumData.map((entry) => (
+            {activeData.map((entry) => (
               <Cell
                 key={entry.genre}
                 fill={entry.change >= 0 ? 'var(--accent-teal)' : 'var(--accent-amber)'}
@@ -89,7 +145,6 @@ function GenreMomentum({ momentumData }) {
         </BarChart>
       </ResponsiveContainer>
 
-      {/* Legend */}
       <div className="flex gap-4 mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-sm inline-block" style={{ background: 'var(--accent-teal)' }} />
