@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, memo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
@@ -16,7 +17,7 @@ function formatMembers(n) {
 
 function TrendTooltip({
   active, payload, label,
-  aggregated, viewershipAggregated, countAggregated, mode, onTitleClick,
+  aggregated, viewershipAggregated, mode, onTitleClick,
 }) {
   if (!active || !payload?.length) return null;
 
@@ -106,6 +107,7 @@ function GenreTrendChart({
   onTitleClick,
 }) {
   const { selectedGenres } = useFilterStore();
+  const navigate = useNavigate();
   const { chartMode: mode, setChartMode: setMode } = useUiStore();
   const [hoveredGenre, setHoveredGenre] = useState(null);
 
@@ -267,6 +269,7 @@ function GenreTrendChart({
             style={{ color: hoveredGenre === genre ? getGenreColour(genre) : 'var(--text-secondary)' }}
             onMouseEnter={enterHandlers[genre]}
             onMouseLeave={clearHover}
+            onClick={() => navigate(`/genres/${genre}`)}
           >
             <span
               className="inline-block w-3 h-0.5 rounded-full"

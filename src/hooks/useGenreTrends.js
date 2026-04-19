@@ -10,6 +10,8 @@ import {
   buildMostWatchedTitles,
   aggregateCountByGenre,
   buildCountChartData,
+  computeGenreCooccurrence,
+  aggregateByStudioAndGenre,
 } from '../utils/transforms';
 
 /**
@@ -188,6 +190,16 @@ export function useGenreTrends(entries, seasonRange) {
     };
   }, [entries, seasonRange]);
 
+  const cooccurrence = useMemo(
+    () => computeGenreCooccurrence(entries, selectedGenres),
+    [entries, selectedGenres],
+  );
+
+  const studioGenreData = useMemo(
+    () => aggregateByStudioAndGenre(entries, selectedGenres),
+    [entries, selectedGenres],
+  );
+
   return {
     aggregated,
     trendData,
@@ -203,5 +215,7 @@ export function useGenreTrends(entries, seasonRange) {
     mostWatchedTitles,
     countAggregated,
     countTrendData,
+    cooccurrence,
+    studioGenreData,
   };
 }

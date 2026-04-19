@@ -1,6 +1,25 @@
 import { memo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import useUiStore from '../store/uiStore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer } from 'recharts';
+
+function GenreTick({ x, y, payload }) {
+  const navigate = useNavigate();
+  return (
+    <text
+      x={x}
+      y={y}
+      dy={4}
+      textAnchor="end"
+      fill="var(--text-secondary)"
+      fontSize={11}
+      style={{ cursor: 'pointer' }}
+      onClick={() => navigate(`/genres/${payload.value}`)}
+    >
+      {payload.value}
+    </text>
+  );
+}
 
 function formatValue(value, mode) {
   if (value == null) return '—';
@@ -127,7 +146,7 @@ function GenreMomentum({ momentumData, viewershipMomentumData, countMomentumData
           <YAxis
             type="category"
             dataKey="genre"
-            tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
+            tick={<GenreTick />}
             axisLine={false}
             tickLine={false}
             width={80}

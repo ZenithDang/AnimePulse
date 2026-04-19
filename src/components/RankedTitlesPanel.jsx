@@ -1,4 +1,5 @@
 import { useState, memo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getGenreColour } from '../utils/colours';
 import { seasonLabel } from '../utils/transforms';
 
@@ -13,6 +14,7 @@ function TitleRow({ title, idx, mode, highlightedId, onTitleClick }) {
   const isHighlighted = highlightedId === title.id;
   const genreColour   = getGenreColour(title.comparedGenre || title.genres?.[0] || '');
   const isBreakout    = mode === 'breakout';
+  const navigate      = useNavigate();
 
   const accentColour  = isBreakout ? 'rgba(167,139,250,' : 'rgba(244,114,182,';
 
@@ -84,17 +86,19 @@ function TitleRow({ title, idx, mode, highlightedId, onTitleClick }) {
 
           <div className="flex flex-wrap gap-1 mt-1.5">
             {(title.genres || []).slice(0, 3).map((genre) => (
-              <span
+              <button
                 key={genre}
+                onClick={(e) => { e.stopPropagation(); navigate(`/genres/${genre}`); }}
                 className="text-[10px] px-1.5 py-0.5 rounded-full"
                 style={{
                   background: `color-mix(in srgb, ${getGenreColour(genre)} 12%, transparent)`,
                   color: getGenreColour(genre),
                   border: `0.5px solid color-mix(in srgb, ${getGenreColour(genre)} 30%, transparent)`,
+                  cursor: 'pointer',
                 }}
               >
                 {genre}
-              </span>
+              </button>
             ))}
 
             {/* Secondary badge */}
