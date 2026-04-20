@@ -13,7 +13,6 @@ import {
   computeGenreCooccurrence,
   aggregateByStudioAndGenre,
   buildStudioTableData,
-  buildSeasonHighlights,
 } from '../utils/transforms';
 
 /**
@@ -170,11 +169,6 @@ export function useGenreTrends(entries, seasonRange) {
     [entries, seasonRange],
   );
 
-  const seasonHighlights = useMemo(
-    () => buildSeasonHighlights(entries, seasonRange),
-    [entries, seasonRange],
-  );
-
   return {
     aggregated,
     trendData,
@@ -191,6 +185,5 @@ export function useGenreTrends(entries, seasonRange) {
     cooccurrence,
     studioGenreData,
     studioTableData,
-    seasonHighlights,
   };
 }

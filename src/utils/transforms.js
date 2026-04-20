@@ -389,28 +389,6 @@ export function buildStudioTableData(entries, seasonRange) {
 }
 
 /**
- * Build per-season highlights: top-scored and most-watched title for each season.
- * Returns one entry per season in seasonRange order, omitting seasons with no data.
- */
-export function buildSeasonHighlights(entries, seasonRange) {
-  const bySeason = {};
-  for (const e of entries) {
-    const key = `${e.season}-${e.year}`;
-    if (!bySeason[key]) bySeason[key] = [];
-    bySeason[key].push(e);
-  }
-  return seasonRange
-    .map(({ season, year }) => {
-      const key  = `${season}-${year}`;
-      const pool = bySeason[key] ?? [];
-      const topScored    = [...pool].filter((e) => e.score > 0).sort((a, b) => b.score - a.score)[0] ?? null;
-      const mostWatched  = [...pool].filter((e) => e.members > 0).sort((a, b) => b.members - a.members)[0] ?? null;
-      return { key, label: seasonLabel(season, year), topScored, mostWatched };
-    })
-    .filter((s) => s.topScored || s.mostWatched);
-}
-
-/**
  * Top titles ranked by AniList popularity.
  */
 export function buildMostWatchedTitles(entries, limit = 10) {

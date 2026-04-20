@@ -6,9 +6,8 @@ A multi-page dashboard for exploring genre trends, viewership, breakout titles, 
 
 ### Summary (`/`)
 
-- **Stat Tiles** — six tiles: Titles Tracked, Seasons Covered, Top Genre (by count), Avg Score, Most Watched Genre (by cumulative popularity), and Avg Popularity / Title. Top Genre and Most Watched Genre are clickable and navigate to the genre drill-down.
-- **Season Highlights** — horizontally scrollable strip with one card per season in the selected range. Each card shows the top-rated and most-watched title for that season; both are clickable and open the detail panel.
-- **Ranked Titles** — tabbed panel. *Breakout* lists titles that most outperformed their genre's average score; *Most Watched* lists titles by AniList popularity. Click any card to open the detail panel. Click a genre pill to navigate to its drill-down page.
+- **Tab Teasers** — three navigation cards at the top of the page linking to Genres, Studios, and Discover. Each card shows a live mini data preview: momentum bars (rising/falling % by genre), a top-3 studio leaderboard by avg score, and a top-3 hidden gem list (score ≥ 7.5, below 50th-percentile in viewership). Hovering highlights the card border in its accent colour.
+- **Ranked Titles** — two-column layout showing the top 5 *Breakout* titles (most above their genre's avg score) and top 5 *Most Watched* titles (by AniList members) side by side. Each row includes a cover art thumbnail with rank overlay, score or member badge, genre pills (navigable to drill-down), and a delta or score secondary badge. Stacks to a single column on mobile.
 
 ### Genres (`/genres`)
 
@@ -104,15 +103,14 @@ src/
     GenreChordDiagram.jsx   — D3 chord diagram of genre co-occurrence
     StudioTable.jsx         — sortable all-studios table (Avg Score, Avg Members, Titles, Top Genre, Score Trend)
     StudioGenreMatrix.jsx   — studio × genre heatmap (Avg Score / Avg Members / Title Count)
-    RankedTitlesPanel.jsx   — tabbed Breakout / Most Watched title list
+    RankedTitlesPanel.jsx   — two-column Breakout / Most Watched title list (top 5 each, cover art thumbnails)
     TitleDetailPanel.jsx    — slide-in detail drawer with completion funnel
-    StatTiles.jsx           — 6-tile summary (score + popularity stats)
     SkeletonLoader.jsx      — loading skeletons and error banner
   contexts/
     GenreTrendsContext.jsx  — React context that exposes useGenreTrends data app-wide,
                               preventing recomputation on page navigation
   pages/
-    SummaryPage.jsx          — / route: stat tiles, season highlights, ranked titles
+    SummaryPage.jsx          — / route: tab teasers with mini previews, ranked titles (2-column)
     GenresPage.jsx           — /genres route: genre trend, heatmap, momentum, chord diagram
     StudiosPage.jsx          — /studios route: stat tiles, studio table, studio×genre matrix
     DiscoverPage.jsx         — /discover route: hidden gem scatter plot + gem grid
@@ -121,7 +119,7 @@ src/
   hooks/
     useSeasonData.js         — React Query hook for season fetching + format filter
     useGenreTrends.js        — score, popularity, count, co-occurrence, studio aggregation,
-                               season highlights, and studio table data; called once in App.jsx
+                               and studio table data; called once in App.jsx
                                and shared via GenreTrendsContext
     useGenreDrillDown.js     — per-genre aggregation for the genre drill-down page
     useStudioDrillDown.js    — per-studio aggregation for the studio drill-down page
@@ -137,9 +135,8 @@ src/
   utils/
     transforms.js           — API normalisation, score / popularity / count aggregation,
                               genre co-occurrence matrix, studio×genre aggregation,
-                              studio table data, season highlights, per-season baseline
-                              computation (computeBaselineByKey), chart data builders,
-                              HTML entity decoder
+                              studio table data, per-season baseline computation,
+                              chart data builders, HTML entity decoder
     colours.js              — genre → accent colour mapping
     format.js               — shared formatMembers utility (K/M number formatting)
     requestQueue.js         — concurrency limiter for AniList API requests
