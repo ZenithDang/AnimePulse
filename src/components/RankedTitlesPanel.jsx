@@ -38,6 +38,9 @@ function TitleRow({ title, idx, mode, highlightedId, onTitleClick }) {
               src={title.image}
               alt=""
               loading="lazy"
+              decoding="async"
+              width={36}
+              height={50}
               className="rounded"
               style={{ width: 36, height: 50, objectFit: 'cover', display: 'block' }}
             />
@@ -108,7 +111,7 @@ function TitleRow({ title, idx, mode, highlightedId, onTitleClick }) {
               <button
                 key={genre}
                 onClick={(e) => { e.stopPropagation(); navigate(`/genres/${genre}`); }}
-                className="text-[11px] px-1.5 py-0.5 rounded-full"
+                className="text-[11px] px-1.5 py-1 rounded-full min-h-[24px] flex items-center"
                 style={{
                   background: `color-mix(in srgb, ${getGenreColour(genre)} 12%, transparent)`,
                   color: getGenreColour(genre),

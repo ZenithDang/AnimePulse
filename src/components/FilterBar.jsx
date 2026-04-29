@@ -66,7 +66,7 @@ export default function FilterBar({ entries = [], genresLoading = false }) {
         <button
           className="md:hidden ml-auto flex items-center gap-2 text-xs px-3 py-1.5"
           onClick={() => setFiltersOpen((o) => !o)}
-          aria-label="Toggle filters"
+          aria-label="Filters"
           aria-expanded={filtersOpen}
           style={{
             borderRadius: '20px',

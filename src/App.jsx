@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -12,12 +12,13 @@ import { useGenreTrends } from './hooks/useGenreTrends';
 import { useUrlSync }     from './hooks/useUrlSync';
 import { GenreTrendsContext } from './contexts/GenreTrendsContext';
 
-import SummaryPage         from './pages/SummaryPage';
-import GenresPage          from './pages/GenresPage';
-import StudiosPage         from './pages/StudiosPage';
-import DiscoverPage        from './pages/DiscoverPage';
-import GenreDrillDownPage  from './pages/GenreDrillDownPage';
-import StudioDrillDownPage from './pages/StudioDrillDownPage';
+import SummaryPage from './pages/SummaryPage';
+import GenresPage  from './pages/GenresPage';
+import StudiosPage from './pages/StudiosPage';
+
+const DiscoverPage        = lazy(() => import('./pages/DiscoverPage'));
+const GenreDrillDownPage  = lazy(() => import('./pages/GenreDrillDownPage'));
+const StudioDrillDownPage = lazy(() => import('./pages/StudioDrillDownPage'));
 
 export default function App() {
   useUrlSync();
@@ -85,14 +86,16 @@ export default function App() {
       )}
 
       <GenreTrendsContext.Provider value={genreTrendsData}>
-        <Routes>
-          <Route path="/"          element={<SummaryPage  onTitleClick={handleTitleClick} />} />
-          <Route path="/genres"    element={<GenresPage   onTitleClick={handleTitleClick} />} />
-          <Route path="/studios"   element={<StudiosPage />} />
-          <Route path="/discover"  element={<DiscoverPage onTitleClick={handleTitleClick} />} />
-          <Route path="/genres/:genre"   element={<GenreDrillDownPage  onTitleClick={handleTitleClick} />} />
-          <Route path="/studios/:studio" element={<StudioDrillDownPage onTitleClick={handleTitleClick} />} />
-        </Routes>
+        <Suspense fallback={<LoadingBar visible />}>
+          <Routes>
+            <Route path="/"          element={<SummaryPage  onTitleClick={handleTitleClick} />} />
+            <Route path="/genres"    element={<GenresPage   onTitleClick={handleTitleClick} />} />
+            <Route path="/studios"   element={<StudiosPage />} />
+            <Route path="/discover"  element={<DiscoverPage onTitleClick={handleTitleClick} />} />
+            <Route path="/genres/:genre"   element={<GenreDrillDownPage  onTitleClick={handleTitleClick} />} />
+            <Route path="/studios/:studio" element={<StudioDrillDownPage onTitleClick={handleTitleClick} />} />
+          </Routes>
+        </Suspense>
       </GenreTrendsContext.Provider>
 
       <TitleDetailPanel title={selectedTitle} onClose={handleClosePanel} />
@@ -106,7 +109,7 @@ export default function App() {
           href="https://anilist.co"
           target="_blank"
           rel="noopener noreferrer"
-          style={{ color: 'var(--accent-violet)', textDecoration: 'none' }}
+          style={{ color: 'var(--accent-violet)', textDecoration: 'underline' }}
         >
           AniList
         </a>
