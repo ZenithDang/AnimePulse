@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import useFilterStore, { SEASONS, getCurrentSeason, defaultStart, defaultEnd, DEFAULT_GENRES, DEFAULT_FORMAT } from '../store/filterStore';
 import { useGenres } from '../hooks/useGenres';
@@ -7,10 +7,9 @@ import { getSeasonColour } from '../utils/colours';
 const SEASON_LABELS  = { winter: 'Winter', spring: 'Spring', summer: 'Summer', fall: 'Fall' };
 const FORMAT_OPTIONS = ['TV', 'Movie', 'OVA', 'ONA'];
 
-const YEAR_OPTIONS = Array.from(
-  { length: new Date().getFullYear() - 2010 + 1 },
-  (_, i) => 2010 + i,
-).reverse();
+const MAX_HISTORY_YEARS = 10;
+const MIN_YEAR = new Date().getFullYear() - MAX_HISTORY_YEARS;
+const YEAR_OPTIONS = Array.from({ length: MAX_HISTORY_YEARS + 1 }, (_, i) => new Date().getFullYear() - i);
 
 export default function FilterBar({ entries = [], genresLoading = false }) {
   const {
@@ -22,6 +21,19 @@ export default function FilterBar({ entries = [], genresLoading = false }) {
 
   const currentSeason = getCurrentSeason();
   const currentYear   = new Date().getFullYear();
+
+  // Clamp any persisted years that are now outside the rolling window
+  useEffect(() => {
+    if (startYear < MIN_YEAR) setStartYear(MIN_YEAR);
+    if (endYear   < MIN_YEAR) setEndYear(MIN_YEAR);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const seasonCount = Math.max(
+    0,
+    (endYear - startYear) * 4 + SEASONS.indexOf(endSeason) - SEASONS.indexOf(startSeason) + 1,
+  );
+  const showLoadWarning = fullData && seasonCount > 12;
 
   const isDirty = (
     startSeason !== defaultStart.season ||
@@ -314,6 +326,24 @@ export default function FilterBar({ entries = [], genresLoading = false }) {
           )}
         </div>
       </div>
+
+      {/* Full-width warning strip — only when all-titles + large range */}
+      {showLoadWarning && (
+        <div
+          className="w-full px-4 py-1.5"
+          style={{
+            borderTop: '0.5px solid rgba(251,191,36,0.25)',
+            background: 'rgba(251,191,36,0.06)',
+          }}
+        >
+          <p
+            className="max-w-[1600px] mx-auto text-xs"
+            style={{ color: 'var(--accent-amber)' }}
+          >
+            ⚠ All titles across {seasonCount} seasons may take several minutes to load
+          </p>
+        </div>
+      )}
 
       {/* Aria-live region for screen readers */}
       <span

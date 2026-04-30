@@ -106,8 +106,6 @@ const useFilterStore = create(
           result.push({ season: SEASONS[idx], year });
           idx++;
           if (idx >= SEASONS.length) { idx = 0; year++; }
-          // Safety cap
-          if (result.length > 24) break;
         }
 
         // Append current in-progress season when toggled on

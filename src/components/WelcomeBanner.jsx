@@ -53,7 +53,7 @@ export default function WelcomeBanner() {
         className="text-sm font-semibold mb-1 pr-6"
         style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
       >
-        Welcome to AnimePulse
+        Welcome to AniSeasonr
       </p>
       <p className="text-xs mb-3" style={{ color: 'var(--text-secondary)' }}>
         An analytics dashboard for seasonal anime trends — explore what's rising, what studios are dominating, and what's worth watching.
